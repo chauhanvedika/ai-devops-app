@@ -1,11 +1,10 @@
-from flask import Flask, Response
+from flask import Flask, Response, jsonify
 import socket
 import logging
-from prometheus_client import Counter, generate_latest
+from prometheus_client import Counter, Gauge, generate_latest
 from ai_analyzer import analyze_logs
-from flask import jsonify
 
-app = Flask(__name__)   # ✅ Initialize FIRST
+app = Flask(__name__)
 
 # -----------------------------
 # 🔹 Setup Logging
@@ -17,9 +16,17 @@ logging.basicConfig(
 )
 
 # -----------------------------
-# 🔹 Prometheus Metric
+# 🔹 Prometheus Metrics
 # -----------------------------
-REQUEST_COUNT = Counter('http_requests_total', 'Total number of requests')
+REQUEST_COUNT = Counter(
+    'http_requests_total',
+    'Total number of requests'
+)
+
+AI_STATUS = Gauge(
+    'ai_system_status',
+    'AI detected system health (0=healthy,1=warning,2=critical)'
+)
 
 # -----------------------------
 # 🔹 Home Route
@@ -61,11 +68,23 @@ def fail():
 def analyze():
     try:
         result = analyze_logs()
-        logging.info("Analyze endpoint called")
+
+        # map status → numeric
+        status_map = {
+            "healthy": 0,
+            "warning": 1,
+            "critical": 2
+        }
+
+        AI_STATUS.set(status_map.get(result.get("status"), 0))
+
+        logging.info(f"AI Analysis: {result}")
+
         return jsonify(result), 200
+
     except Exception as e:
         logging.error(f"Analyzer failed: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500   # ✅ return JSON
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # -----------------------------
 # 🔹 Run App
