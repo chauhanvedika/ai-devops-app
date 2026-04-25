@@ -1,20 +1,44 @@
-import time
-
 def analyze_logs():
-    with open("app.log", "r") as f:
-        lines = f.readlines()
+    try:
+        with open("app.log", "r") as f:
+            lines = f.readlines()
 
-    error_count = 0
+        recent_logs = lines[-50:]  # analyze last 50 logs
+        error_count = 0
+        error_types = {}
 
-    for line in lines[-20:]:  # last 20 logs
-        if "ERROR" in line:
-            error_count += 1
+        for line in recent_logs:
+            if "ERROR" in line:
+                error_count += 1
 
-    if error_count > 3:
-        print("🚨 ALERT: High error rate detected!")
-    else:
-        print("✅ System looks healthy")
+                # classify errors
+                if "Database" in line:
+                    error_types["database"] = error_types.get("database", 0) + 1
+                elif "Timeout" in line:
+                    error_types["timeout"] = error_types.get("timeout", 0) + 1
+                else:
+                    error_types["other"] = error_types.get("other", 0) + 1
 
-while True:
-    analyze_logs()
-    time.sleep(10)
+        # -----------------------------
+        # 🔥 Intelligent decision logic
+        # -----------------------------
+        if error_count == 0:
+            status = "healthy"
+        elif error_count <= 3:
+            status = "warning"
+        else:
+            status = "critical"
+
+        return {
+            "status": status,
+            "error_count": error_count,
+            "error_types": error_types,
+            "analyzed_logs": len(recent_logs)
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+        
