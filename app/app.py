@@ -3,9 +3,11 @@ import socket
 import logging
 from prometheus_client import Counter, Gauge, generate_latest
 from ai_analyzer import analyze_logs
+import threading
+import time
 
 app = Flask(__name__)
-
+CURRENT_STATUS = {"value": "healthy"}
 # -----------------------------
 # 🔹 Setup Logging
 # -----------------------------
@@ -42,8 +44,28 @@ def home():
 # -----------------------------
 @app.route("/health")
 def health():
-    logging.info("Health check called")
-    return {"status": "healthy"}, 200
+    result = analyze_logs()
+    status = result.get("status", "healthy")
+    code = 200 if status == "healthy" else 500
+    return {"status": status, "error_count": result.get("error_count", 0)}, code
+
+def self_healing_loop():
+    while True:
+        time.sleep(20)  # check every 20 seconds
+        result = analyze_logs()
+        status = result.get("status")
+        
+        if status == "critical":
+            logging.warning("🚨 CRITICAL detected — Self-healing triggered!")
+            
+            # Clear the log (simulate pod recovery)
+            open("app.log", "w").close()
+            
+            # Reset metric
+            AI_STATUS.set(0)
+            
+            logging.info("✅ Self-healing complete — system restored to healthy")
+
 
 # -----------------------------
 # 🔹 Metrics
